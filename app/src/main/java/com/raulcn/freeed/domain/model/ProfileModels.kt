@@ -34,3 +34,24 @@ data class CompanyProfile(
     val isVerified: Boolean
 )
 
+data class PublicStudentProfile(
+    val id: String,
+    val displayName: String,
+    val bio: String?,
+    val universityName: String?,
+    val degreeProgram: String?,
+    val semester: Int?,
+    val avatarUrl: String? = null,
+    val skills: List<String> = emptyList()
+)
+
+data class PublicCompanyProfile(
+    val id: String,
+    val displayName: String,
+    val businessName: String,
+    val industry: String?,
+    val contactPersonName: String?,
+    val description: String?,
+    val websiteUrl: String?,
+    val logoUrl: String? = null
+)

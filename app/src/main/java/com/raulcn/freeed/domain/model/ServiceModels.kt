@@ -20,6 +20,6 @@ data class Service(
     val status: ServiceStatus,
     val modality: ServiceModality,
     val priceLabel: String?,
-    val tags: List<String> = emptyList()
+    val tags: List<String> = emptyList(),
+    val imageUrl: String? = null
 )
-

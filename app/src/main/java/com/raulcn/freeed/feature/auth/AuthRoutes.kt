@@ -26,6 +26,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Apartment
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.MarkEmailRead
 import androidx.compose.material.icons.rounded.School
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -161,10 +162,10 @@ fun RegisterRoute(
 
     AccessPage(
         onBackClick = {
-            if (currentStep == 2) {
-                currentStep = 1
-            } else {
-                onBackClick()
+            when {
+                uiState.awaitingEmailConfirmation -> onBackClick()
+                currentStep == 2 -> currentStep = 1
+                else -> onBackClick()
             }
         }
     ) {
@@ -173,7 +174,12 @@ fun RegisterRoute(
         )
         Spacer(modifier = Modifier.height(22.dp))
         AccessCard {
-            if (currentStep == 1) {
+            if (uiState.awaitingEmailConfirmation) {
+                EmailConfirmationPanel(
+                    email = uiState.confirmationEmail.orEmpty(),
+                    onGoToLogin = onBackClick
+                )
+            } else if (currentStep == 1) {
                 Text(
                     text = "Como te describes?",
                     style = MaterialTheme.typography.headlineSmall,
@@ -263,7 +269,7 @@ fun RegisterRoute(
                     placeholder = "Repite tu contrasena"
                 )
             }
-            if (uiState.message != null) {
+            if (uiState.message != null && !uiState.awaitingEmailConfirmation) {
                 Spacer(modifier = Modifier.height(14.dp))
                 Text(
                     text = uiState.message ?: "",
@@ -275,7 +281,7 @@ fun RegisterRoute(
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
-            if (currentStep == 2) {
+            if (currentStep == 2 && !uiState.awaitingEmailConfirmation) {
                 Spacer(modifier = Modifier.height(22.dp))
                 Button(
                     onClick = { viewModel.register(onFinished = onRegistrationFinished) },
@@ -578,6 +584,54 @@ private fun RoleChoiceChip(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun EmailConfirmationPanel(
+    email: String,
+    onGoToLogin: () -> Unit
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Surface(
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+            shape = CircleShape
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.MarkEmailRead,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .padding(18.dp)
+                    .size(36.dp)
+            )
+        }
+        Spacer(modifier = Modifier.height(18.dp))
+        Text(
+            text = "Revisa tu correo",
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+        Text(
+            text = if (email.isNotBlank()) {
+                "Te enviamos un enlace de verificacion a $email. Confirma tu correo y vuelve a iniciar sesion."
+            } else {
+                "Te enviamos un enlace de verificacion. Confirma tu correo y vuelve a iniciar sesion."
+            },
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(22.dp))
+        Button(
+            onClick = onGoToLogin,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(18.dp)
+        ) {
+            Text("Ir al inicio de sesion")
         }
     }
 }

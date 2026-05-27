@@ -11,8 +11,13 @@ import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.query.Columns
 import kotlinx.coroutines.delay
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
-class ProfileRepository {
+class ProfileRepository(
+    private val assetsRepository: AssetsRepository = AssetsRepository(),
+    private val skillsRepository: SkillsRepository = SkillsRepository()
+) {
 
     private val client = SupabaseClientProvider.client
 
@@ -25,7 +30,7 @@ class ProfileRepository {
             }
 
             val profile = client.from("profiles").select(
-                columns = Columns.list("id", "email", "role", "profile_status", "display_name", "bio")
+                columns = Columns.list("id", "email", "role", "profile_status", "display_name", "bio", "avatar_asset_id")
             ) {
                 filter {
                     eq("id", user.id)
@@ -37,6 +42,8 @@ class ProfileRepository {
                 return@repeat
             }
 
+            val avatarUrl = profile.avatarAssetId?.let { runCatching { assetsRepository.getAssetPublicUrl(it) }.getOrNull() }
+
             return when (profile.role.asUserRole()) {
                 UserRole.STUDENT -> {
                     val studentProfile = client.from("student_profiles").select(
@@ -47,6 +54,9 @@ class ProfileRepository {
                         }
                     }.decodeSingleOrNull<StudentProfileDto>()
 
+                    val skills = runCatching { skillsRepository.getCurrentUserSkillNames() }
+                        .getOrDefault(emptyList())
+
                     AppUserProfile(
                         id = profile.id,
                         email = profile.email,
@@ -56,18 +66,32 @@ class ProfileRepository {
                         bio = profile.bio,
                         universityName = studentProfile?.universityName,
                         degreeProgram = studentProfile?.degreeProgram,
-                        semester = studentProfile?.semester
+                        semester = studentProfile?.semester,
+                        avatarUrl = avatarUrl,
+                        skills = skills
                     )
                 }
 
                 UserRole.COMPANY -> {
                     val companyProfile = client.from("company_profiles").select(
-                        columns = Columns.list("profile_id", "business_name", "industry", "contact_person_name")
+                        columns = Columns.list(
+                            "profile_id",
+                            "business_name",
+                            "industry",
+                            "contact_person_name",
+                            "description",
+                            "website_url",
+                            "logo_asset_id"
+                        )
                     ) {
                         filter {
                             eq("profile_id", user.id)
                         }
                     }.decodeSingleOrNull<CompanyProfileDto>()
+
+                    val companyLogoUrl = companyProfile?.logoAssetId?.let {
+                        runCatching { assetsRepository.getAssetPublicUrl(it) }.getOrNull()
+                    }
 
                     AppUserProfile(
                         id = profile.id,
@@ -78,7 +102,9 @@ class ProfileRepository {
                         bio = profile.bio,
                         businessName = companyProfile?.businessName,
                         industry = companyProfile?.industry,
-                        contactPersonName = companyProfile?.contactPersonName
+                        contactPersonName = companyProfile?.contactPersonName,
+                        companyLogoUrl = companyLogoUrl,
+                        avatarUrl = avatarUrl
                     )
                 }
 
@@ -88,7 +114,8 @@ class ProfileRepository {
                     role = UserRole.ADMIN,
                     profileStatus = profile.profileStatus.asProfileStatus(),
                     displayName = profile.displayName,
-                    bio = profile.bio
+                    bio = profile.bio,
+                    avatarUrl = avatarUrl
                 )
             }
         }
@@ -101,15 +128,16 @@ class ProfileRepository {
         universityName: String,
         degreeProgram: String,
         semester: Int,
-        bio: String
+        bio: String,
+        skillIds: List<String> = emptyList()
     ) {
         val userId = requireCurrentUserId()
 
         client.from("profiles").update(
-            mapOf(
-                "display_name" to displayName.trim(),
-                "bio" to bio.trim()
-            )
+            buildJsonObject {
+                put("display_name", displayName.trim())
+                put("bio", bio.trim())
+            }
         ) {
             filter {
                 eq("id", userId)
@@ -117,16 +145,18 @@ class ProfileRepository {
         }
 
         client.from("student_profiles").update(
-            mapOf(
-                "university_name" to universityName.trim(),
-                "degree_program" to degreeProgram.trim(),
-                "semester" to semester
-            )
+            buildJsonObject {
+                put("university_name", universityName.trim())
+                put("degree_program", degreeProgram.trim())
+                put("semester", semester)
+            }
         ) {
             filter {
                 eq("profile_id", userId)
             }
         }
+
+        skillsRepository.replaceCurrentUserSkills(skillIds)
     }
 
     suspend fun completeCompanyProfile(
@@ -139,10 +169,10 @@ class ProfileRepository {
         val userId = requireCurrentUserId()
 
         client.from("profiles").update(
-            mapOf(
-                "display_name" to displayName.trim(),
-                "bio" to description.trim()
-            )
+            buildJsonObject {
+                put("display_name", displayName.trim())
+                put("bio", description.trim())
+            }
         ) {
             filter {
                 eq("id", userId)
@@ -150,16 +180,38 @@ class ProfileRepository {
         }
 
         client.from("company_profiles").update(
-            mapOf(
-                "business_name" to businessName.trim(),
-                "industry" to industry.trim(),
-                "contact_person_name" to contactPersonName.trim(),
-                "description" to description.trim()
-            )
+            buildJsonObject {
+                put("business_name", businessName.trim())
+                put("industry", industry.trim())
+                put("contact_person_name", contactPersonName.trim())
+                put("description", description.trim())
+            }
         ) {
             filter {
                 eq("profile_id", userId)
             }
+        }
+    }
+
+    suspend fun updateAvatar(assetId: String) {
+        val userId = requireCurrentUserId()
+        client.from("profiles").update(
+            buildJsonObject {
+                put("avatar_asset_id", assetId)
+            }
+        ) {
+            filter { eq("id", userId) }
+        }
+    }
+
+    suspend fun updateCompanyLogo(assetId: String) {
+        val userId = requireCurrentUserId()
+        client.from("company_profiles").update(
+            buildJsonObject {
+                put("logo_asset_id", assetId)
+            }
+        ) {
+            filter { eq("profile_id", userId) }
         }
     }
 

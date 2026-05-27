@@ -22,6 +22,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -32,13 +33,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.raulcn.freeed.data.repository.SkillOption
 import com.raulcn.freeed.domain.model.AppUserProfile
 import com.raulcn.freeed.feature.system.FreeEdFeatureScaffold
+import com.raulcn.freeed.feature.system.ImagePickerField
 
 @Composable
 fun RoleSelectionRoute(
@@ -91,6 +95,7 @@ fun StudentProfileSetupRoute(
 ) {
     val viewModel: StudentProfileSetupViewModel = viewModel()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val contentResolver = LocalContext.current.contentResolver
 
     FreeEdFeatureScaffold(
         title = "Completa tu perfil",
@@ -107,6 +112,15 @@ fun StudentProfileSetupRoute(
         )
         Spacer(modifier = Modifier.height(18.dp))
         ProfileFormCard {
+            ImagePickerField(
+                label = "Foto de perfil",
+                helperText = "Opcional. Una foto ayuda a que las empresas te identifiquen.",
+                pickedUri = uiState.pickedAvatarUri,
+                currentImageUrl = uiState.avatarUrl,
+                onPicked = viewModel::onAvatarPicked,
+                circular = true
+            )
+            Spacer(modifier = Modifier.height(14.dp))
             OutlinedTextField(
                 value = uiState.displayName,
                 onValueChange = viewModel::onDisplayNameChange,
@@ -143,6 +157,18 @@ fun StudentProfileSetupRoute(
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 4
             )
+            Spacer(modifier = Modifier.height(14.dp))
+            SkillsPickerBlock(
+                skills = uiState.availableSkills,
+                selectedSkillIds = uiState.selectedSkillIds,
+                query = uiState.skillsQuery,
+                newSkillName = uiState.newSkillName,
+                isLoading = uiState.isLoadingSkills,
+                onQueryChange = viewModel::onSkillsQueryChange,
+                onNewSkillNameChange = viewModel::onNewSkillNameChange,
+                onAddNewSkill = viewModel::addCustomSkill,
+                onToggleSkill = viewModel::onToggleSkill
+            )
             if (uiState.errorMessage != null) {
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
@@ -152,7 +178,7 @@ fun StudentProfileSetupRoute(
             }
             Spacer(modifier = Modifier.height(18.dp))
             Button(
-                onClick = { viewModel.save(onComplete) },
+                onClick = { viewModel.save(contentResolver, onComplete) },
                 enabled = !uiState.isSaving,
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -167,6 +193,96 @@ fun StudentProfileSetupRoute(
 }
 
 @Composable
+private fun SkillsPickerBlock(
+    skills: List<SkillOption>,
+    selectedSkillIds: Set<String>,
+    query: String,
+    newSkillName: String,
+    isLoading: Boolean,
+    onQueryChange: (String) -> Unit,
+    onNewSkillNameChange: (String) -> Unit,
+    onAddNewSkill: () -> Unit,
+    onToggleSkill: (String) -> Unit
+) {
+    Text(
+        text = "Habilidades y tecnologias",
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurface
+    )
+    Spacer(modifier = Modifier.height(8.dp))
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQueryChange,
+        label = { Text("Buscar skill") },
+        modifier = Modifier.fillMaxWidth()
+    )
+    Spacer(modifier = Modifier.height(10.dp))
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        OutlinedTextField(
+            value = newSkillName,
+            onValueChange = onNewSkillNameChange,
+            label = { Text("Agregar skill nueva") },
+            modifier = Modifier.weight(1f)
+        )
+        Button(onClick = onAddNewSkill, shape = RoundedCornerShape(14.dp)) {
+            Text("Agregar")
+        }
+    }
+    Spacer(modifier = Modifier.height(10.dp))
+    if (isLoading) {
+        CircularProgressIndicator(strokeWidth = 2.dp)
+        return
+    }
+    val filteredSkills = skills.filter {
+        query.isBlank() || it.name.contains(query.trim(), ignoreCase = true)
+    }.take(24)
+    if (filteredSkills.isEmpty()) {
+        Text(
+            text = "No encontramos skills con ese texto.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        return
+    }
+    val rows = buildSkillRowsForPicker(filteredSkills)
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        rows.forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                row.forEach { skill ->
+                    FilterChip(
+                        selected = selectedSkillIds.contains(skill.id),
+                        onClick = { onToggleSkill(skill.id) },
+                        label = { Text(skill.name) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun buildSkillRowsForPicker(
+    skills: List<SkillOption>,
+    maxScorePerRow: Int = 34
+): List<List<SkillOption>> {
+    if (skills.isEmpty()) return emptyList()
+    val rows = mutableListOf<MutableList<SkillOption>>()
+    var currentRow = mutableListOf<SkillOption>()
+    var currentScore = 0
+    skills.forEach { skill ->
+        val score = (skill.name.length + 6).coerceAtMost(maxScorePerRow)
+        if (currentRow.isNotEmpty() && currentScore + score > maxScorePerRow) {
+            rows.add(currentRow)
+            currentRow = mutableListOf()
+            currentScore = 0
+        }
+        currentRow.add(skill)
+        currentScore += score
+    }
+    if (currentRow.isNotEmpty()) rows.add(currentRow)
+    return rows
+}
+
+@Composable
 fun CompanyProfileSetupRoute(
     sessionProfile: AppUserProfile?,
     onComplete: () -> Unit,
@@ -174,6 +290,7 @@ fun CompanyProfileSetupRoute(
 ) {
     val viewModel: CompanyProfileSetupViewModel = viewModel()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val contentResolver = LocalContext.current.contentResolver
 
     FreeEdFeatureScaffold(
         title = "Completa tu negocio",
@@ -190,6 +307,15 @@ fun CompanyProfileSetupRoute(
         )
         Spacer(modifier = Modifier.height(18.dp))
         ProfileFormCard {
+            ImagePickerField(
+                label = "Logo de empresa",
+                helperText = "Opcional. Sube tu logo para dar confianza y reconocimiento.",
+                pickedUri = uiState.pickedLogoUri,
+                currentImageUrl = uiState.logoUrl,
+                onPicked = viewModel::onLogoPicked,
+                circular = true
+            )
+            Spacer(modifier = Modifier.height(14.dp))
             OutlinedTextField(
                 value = uiState.displayName,
                 onValueChange = viewModel::onDisplayNameChange,
@@ -234,7 +360,7 @@ fun CompanyProfileSetupRoute(
             }
             Spacer(modifier = Modifier.height(18.dp))
             Button(
-                onClick = { viewModel.save(onComplete) },
+                onClick = { viewModel.save(contentResolver, onComplete) },
                 enabled = !uiState.isSaving,
                 modifier = Modifier.fillMaxWidth()
             ) {

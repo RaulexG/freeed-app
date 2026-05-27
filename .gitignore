@@ -35,3 +35,12 @@ local.properties
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# Local Supabase CLI binaries and runtime state (must not be committed)
+/tools/
+/supabase/supabase/
+/supabase/.temp/
+
+# Local artifacts at repo root
+*.tar.gz
+*.exe

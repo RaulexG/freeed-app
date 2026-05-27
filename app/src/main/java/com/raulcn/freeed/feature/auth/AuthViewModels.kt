@@ -25,7 +25,9 @@ data class RegisterFormUiState(
     val selectedRole: UserRole? = null,
     val isLoading: Boolean = false,
     val message: String? = null,
-    val isSuccessMessage: Boolean = false
+    val isSuccessMessage: Boolean = false,
+    val awaitingEmailConfirmation: Boolean = false,
+    val confirmationEmail: String? = null
 )
 
 class LoginViewModel(
@@ -96,18 +98,27 @@ class RegisterViewModel(
                     role = state.selectedRole ?: UserRole.STUDENT
                 )
             }.onSuccess { signedIn ->
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        message = if (signedIn) {
-                            "Cuenta creada correctamente."
-                        } else {
-                            "Cuenta creada. Revisa tu correo para confirmar el acceso."
-                        },
-                        isSuccessMessage = true
-                    )
+                if (signedIn) {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            message = "Cuenta creada correctamente.",
+                            isSuccessMessage = true,
+                            awaitingEmailConfirmation = false
+                        )
+                    }
+                    onFinished()
+                } else {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            message = null,
+                            isSuccessMessage = true,
+                            awaitingEmailConfirmation = true,
+                            confirmationEmail = state.email.trim()
+                        )
+                    }
                 }
-                onFinished()
             }.onFailure { throwable ->
                 _uiState.update {
                     it.copy(

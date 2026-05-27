@@ -16,27 +16,38 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.School
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import com.raulcn.freeed.core.model.ServiceModality
 import com.raulcn.freeed.core.model.UserRole
 import com.raulcn.freeed.domain.model.AppUserProfile
@@ -118,7 +129,11 @@ fun HomeRoute(
             uiState.featuredServices.forEach { service ->
                 ServicePreviewCard(
                     service = service,
-                    onOpen = { onOpenService(service.id) }
+                    onOpen = { onOpenService(service.id) },
+                    isFavorite = uiState.favoriteIds.contains(service.id),
+                    onToggleFavorite = if (uiState.isCompany) {
+                        { viewModel.toggleFavorite(service.id) }
+                    } else null
                 )
                 Spacer(modifier = Modifier.height(12.dp))
             }
@@ -131,47 +146,153 @@ fun ExploreRoute(
     sessionProfile: AppUserProfile?,
     onOpenOwnProfile: () -> Unit,
     onOpenService: (String) -> Unit,
+    onOpenStudent: (String) -> Unit,
     onRequireAuth: () -> Unit
 ) {
     val viewModel: ExploreViewModel = viewModel()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    LaunchedEffect(Unit) {
-        viewModel.load()
+    LaunchedEffect(sessionProfile?.id) {
+        viewModel.load(sessionProfile)
     }
 
     FreeEdFeatureScaffold(
         title = "Explorar",
         subtitle = "Servicios publicados"
     ) {
-        SearchSurface()
-        Spacer(modifier = Modifier.height(20.dp))
+        SearchBarField(
+            value = uiState.query,
+            onValueChange = viewModel::onQueryChange,
+            isSearching = uiState.isSearching
+        )
+        Spacer(modifier = Modifier.height(14.dp))
 
-        if (uiState.isLoading) {
-            CircularProgressIndicator()
-            Spacer(modifier = Modifier.height(16.dp))
+        if (uiState.categories.isNotEmpty()) {
+            CategoryFilterRow(
+                categories = uiState.categories,
+                selectedId = uiState.selectedCategoryId,
+                onToggle = viewModel::onCategoryToggle
+            )
+            Spacer(modifier = Modifier.height(10.dp))
         }
 
-        if (uiState.errorMessage != null) {
-            FeatureInfoCard(
+        ModalityFilterRow(
+            selected = uiState.selectedModality,
+            onToggle = viewModel::onModalityToggle
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+        TalentFiltersPanel(
+            skillQuery = uiState.skillQuery,
+            universityQuery = uiState.universityQuery,
+            degreeQuery = uiState.degreeQuery,
+            semesterQuery = uiState.semesterQuery,
+            onSkillChange = viewModel::onSkillQueryChange,
+            onUniversityChange = viewModel::onUniversityQueryChange,
+            onDegreeChange = viewModel::onDegreeQueryChange,
+            onSemesterChange = viewModel::onSemesterQueryChange
+        )
+
+        if (uiState.hasActiveFilters) {
+            Spacer(modifier = Modifier.height(8.dp))
+            TextButton(onClick = viewModel::clearFilters) {
+                Icon(Icons.Outlined.Close, contentDescription = null)
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Limpiar filtros")
+            }
+        }
+
+        Spacer(modifier = Modifier.height(18.dp))
+
+        when {
+            uiState.isLoading -> CircularProgressIndicator()
+            uiState.errorMessage != null && uiState.services.isEmpty() -> FeatureInfoCard(
                 eyebrow = "ERROR",
                 title = "No pudimos cargar la exploracion",
                 body = uiState.errorMessage.orEmpty()
             )
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-
-        SectionHeader(title = "Servicios", actionLabel = null, onActionClick = null)
-        Spacer(modifier = Modifier.height(14.dp))
-
-        uiState.services.forEach { service ->
-            ServicePreviewCard(
-                service = service,
-                onOpen = { onOpenService(service.id) }
+            uiState.services.isEmpty() -> FeatureInfoCard(
+                eyebrow = "BUSQUEDA",
+                title = "No hay resultados",
+                body = if (uiState.hasActiveFilters) {
+                    "Intenta con otra palabra clave o limpia los filtros."
+                } else {
+                    "Todavia no hay servicios publicados."
+                }
             )
-            Spacer(modifier = Modifier.height(12.dp))
+            else -> {
+                SectionHeader(title = "Resultados", actionLabel = null, onActionClick = null)
+                Spacer(modifier = Modifier.height(14.dp))
+                uiState.services.forEach { service ->
+                    ServicePreviewCard(
+                        service = service,
+                        onOpen = { onOpenService(service.id) },
+                        onOpenAuthor = { onOpenStudent(service.studentId) },
+                        isFavorite = uiState.favoriteIds.contains(service.id),
+                        onToggleFavorite = if (uiState.isCompany) {
+                            { viewModel.toggleFavorite(service.id) }
+                        } else null
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+            }
         }
     }
+}
+
+@Composable
+private fun TalentFiltersPanel(
+    skillQuery: String,
+    universityQuery: String,
+    degreeQuery: String,
+    semesterQuery: String,
+    onSkillChange: (String) -> Unit,
+    onUniversityChange: (String) -> Unit,
+    onDegreeChange: (String) -> Unit,
+    onSemesterChange: (String) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    OutlinedButton(onClick = { expanded = !expanded }, modifier = Modifier.fillMaxWidth()) {
+        Text(if (expanded) "Ocultar filtros de talento" else "Filtros de talento")
+    }
+    if (!expanded) return
+
+    Spacer(modifier = Modifier.height(10.dp))
+    OutlinedTextField(
+        value = skillQuery,
+        onValueChange = onSkillChange,
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = true,
+        shape = RoundedCornerShape(16.dp),
+        placeholder = { Text("Skill (ej: Kotlin, Figma)") }
+    )
+    Spacer(modifier = Modifier.height(8.dp))
+    OutlinedTextField(
+        value = universityQuery,
+        onValueChange = onUniversityChange,
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = true,
+        shape = RoundedCornerShape(16.dp),
+        placeholder = { Text("Universidad") }
+    )
+    Spacer(modifier = Modifier.height(8.dp))
+    OutlinedTextField(
+        value = degreeQuery,
+        onValueChange = onDegreeChange,
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = true,
+        shape = RoundedCornerShape(16.dp),
+        placeholder = { Text("Carrera") }
+    )
+    Spacer(modifier = Modifier.height(8.dp))
+    OutlinedTextField(
+        value = semesterQuery,
+        onValueChange = onSemesterChange,
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = true,
+        shape = RoundedCornerShape(16.dp),
+        placeholder = { Text("Semestre (ej: 6)") }
+    )
 }
 
 @Composable
@@ -187,38 +308,25 @@ fun CreateServiceRoute(
     ) {
         when {
             !hasActiveSession -> {
-                FeatureInfoCard(
-                    eyebrow = "ACCESO",
-                    title = "Inicia sesion para publicar",
-                    body = "Necesitas una cuenta de estudiante para crear servicios.",
-                    actionLabel = "Iniciar sesion",
-                    onActionClick = onRequireAuth
-                )
+                Button(onClick = onRequireAuth, modifier = Modifier.fillMaxWidth()) {
+                    Text("Iniciar sesion")
+                }
             }
 
             sessionProfile == null -> {
-                EmptyInfoCard(
-                    title = "Estamos preparando tu cuenta",
-                    body = "Tu sesion ya esta activa. Espera un momento y vuelve a intentarlo."
-                )
+                CircularProgressIndicator()
             }
 
             sessionProfile.role == UserRole.COMPANY -> {
                 EmptyInfoCard(
-                    title = "Las empresas no publican servicios",
-                    body = "Tu cuenta esta pensada para explorar talento y enviar solicitudes."
+                    title = "Solo estudiantes publican servicios",
+                    body = "Con cuenta de empresa puedes explorar talento y enviar solicitudes."
                 )
             }
 
             else -> {
-                FeatureInfoCard(
-                    eyebrow = "SERVICIOS",
-                    title = "Tu propuesta profesional empieza aqui",
-                    body = "Desde aqui crearemos tus servicios con categoria, precio, modalidad e imagenes."
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Button(onClick = onOpenEditor) {
-                    Text("Ir al editor")
+                Button(onClick = onOpenEditor, modifier = Modifier.fillMaxWidth()) {
+                    Text("Crear servicio")
                 }
             }
         }
@@ -298,28 +406,74 @@ private fun HomeTopBar(
 }
 
 @Composable
-private fun SearchSurface() {
-    Surface(
-        color = MaterialTheme.colorScheme.surface,
+private fun SearchBarField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    isSearching: Boolean
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = true,
         shape = RoundedCornerShape(18.dp),
-        tonalElevation = 1.dp
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
+        placeholder = { Text("Buscar habilidades, servicios o talento") },
+        leadingIcon = {
             Icon(
                 imageVector = Icons.Outlined.Search,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                contentDescription = null
             )
-            Text(
-                text = "Buscar habilidades, servicios o talento",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        trailingIcon = {
+            when {
+                isSearching -> CircularProgressIndicator(
+                    strokeWidth = 2.dp,
+                    modifier = Modifier.padding(8.dp)
+                )
+                value.isNotBlank() -> IconButton(onClick = { onValueChange("") }) {
+                    Icon(Icons.Outlined.Close, contentDescription = "Limpiar")
+                }
+            }
+        }
+    )
+}
+
+@Composable
+private fun CategoryFilterRow(
+    categories: List<Category>,
+    selectedId: String?,
+    onToggle: (String?) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        categories.forEach { category ->
+            FilterChip(
+                selected = selectedId == category.id,
+                onClick = { onToggle(category.id) },
+                label = { Text(category.name) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun ModalityFilterRow(
+    selected: ServiceModality?,
+    onToggle: (ServiceModality) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        ServiceModality.entries.forEach { modality ->
+            FilterChip(
+                selected = selected == modality,
+                onClick = { onToggle(modality) },
+                label = { Text(modality.label) }
             )
         }
     }
@@ -352,7 +506,10 @@ private fun SectionHeader(
 @Composable
 private fun ServicePreviewCard(
     service: Service,
-    onOpen: () -> Unit
+    onOpen: () -> Unit,
+    onOpenAuthor: (() -> Unit)? = null,
+    isFavorite: Boolean = false,
+    onToggleFavorite: (() -> Unit)? = null
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -369,14 +526,19 @@ private fun ServicePreviewCard(
                     .height(88.dp),
                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                ) {
+                if (!service.imageUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = service.imageUrl,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxWidth(),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+                Box(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
                     Surface(
                         color = MaterialTheme.colorScheme.surface,
-                        shape = RoundedCornerShape(999.dp)
+                        shape = RoundedCornerShape(999.dp),
+                        modifier = Modifier.align(Alignment.CenterStart)
                     ) {
                         Text(
                             text = service.modality.label,
@@ -384,6 +546,18 @@ private fun ServicePreviewCard(
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.primary
                         )
+                    }
+                    if (onToggleFavorite != null) {
+                        IconButton(
+                            onClick = onToggleFavorite,
+                            modifier = Modifier.align(Alignment.CenterEnd)
+                        ) {
+                            Icon(
+                                imageVector = if (isFavorite) Icons.Rounded.Favorite else Icons.Outlined.FavoriteBorder,
+                                contentDescription = if (isFavorite) "Quitar de favoritos" else "Guardar en favoritos",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
                 }
             }
@@ -408,8 +582,15 @@ private fun ServicePreviewCard(
                 Spacer(modifier = Modifier.height(12.dp))
                 Chip(text = service.priceLabel ?: "Precio a convenir")
                 Spacer(modifier = Modifier.height(14.dp))
-                OutlinedButton(onClick = onOpen) {
-                    Text("Ver detalle")
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedButton(onClick = onOpen) {
+                        Text("Ver detalle")
+                    }
+                    if (onOpenAuthor != null) {
+                        TextButton(onClick = onOpenAuthor) {
+                            Text("Ver perfil")
+                        }
+                    }
                 }
             }
         }

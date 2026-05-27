@@ -13,6 +13,8 @@ data class HomeUiState(
     val servicesCount: Int = 0,
     val portfolioCount: Int = 0,
     val requestsCount: Int = 0,
+    val favoriteIds: Set<String> = emptySet(),
+    val isCompany: Boolean = false,
     val isLoading: Boolean = false,
     val errorMessage: String? = null
 )

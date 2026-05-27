@@ -285,66 +285,6 @@ private fun AccessBackgroundDecoration() {
 }
 
 @Composable
-fun FavoritesRoute(onBackClick: () -> Unit) {
-    FreeEdFeatureScaffold(
-        title = "Favoritos",
-        subtitle = "Perfiles y servicios guardados",
-        onBackClick = onBackClick
-    ) {
-        FeatureInfoCard(
-            eyebrow = "FASE 7",
-            title = "Favoritos listos para conectarse",
-            body = "Esta pantalla sera el espacio de guardados para empresas cuando entremos a la fase de exploracion real."
-        )
-    }
-}
-
-@Composable
-fun MyServicesRoute(onBackClick: () -> Unit) {
-    FreeEdFeatureScaffold(
-        title = "Mis servicios",
-        subtitle = "Gestion de servicios del estudiante",
-        onBackClick = onBackClick
-    ) {
-        FeatureInfoCard(
-            eyebrow = "FASE 6",
-            title = "Gestion de servicios preparada",
-            body = "Aqui vivira el listado real de servicios, estados de publicacion y acciones de edicion."
-        )
-    }
-}
-
-@Composable
-fun SentRequestsRoute(onBackClick: () -> Unit) {
-    FreeEdFeatureScaffold(
-        title = "Solicitudes enviadas",
-        subtitle = "Historial del negocio",
-        onBackClick = onBackClick
-    ) {
-        FeatureInfoCard(
-            eyebrow = "FASE 7",
-            title = "Historial listo para integrarse",
-            body = "Cuando conectemos solicitudes, esta pantalla mostrara el seguimiento de cada oportunidad enviada."
-        )
-    }
-}
-
-@Composable
-fun ReceivedRequestsRoute(onBackClick: () -> Unit) {
-    FreeEdFeatureScaffold(
-        title = "Solicitudes recibidas",
-        subtitle = "Bandeja de oportunidades",
-        onBackClick = onBackClick
-    ) {
-        FeatureInfoCard(
-            eyebrow = "FASE 7",
-            title = "Bandeja preparada",
-            body = "Aqui vivira la bandeja de oportunidades reales para estudiantes."
-        )
-    }
-}
-
-@Composable
 fun SettingsRoute(onBackClick: () -> Unit) {
     FreeEdFeatureScaffold(
         title = "Configuracion",
@@ -352,9 +292,9 @@ fun SettingsRoute(onBackClick: () -> Unit) {
         onBackClick = onBackClick
     ) {
         FeatureInfoCard(
-            eyebrow = "FASE 9",
-            title = "Configuracion lista para pulido",
-            body = "En esta pantalla agregaremos privacidad, visibilidad del perfil y ajustes finales de cuenta."
+            eyebrow = "CUENTA",
+            title = "Preferencias de perfil",
+            body = "Pronto podras ajustar visibilidad del perfil, privacidad y notificaciones."
         )
     }
 }

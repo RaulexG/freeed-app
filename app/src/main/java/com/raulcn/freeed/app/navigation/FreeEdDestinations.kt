@@ -15,6 +15,8 @@ sealed class FreeEdDestination(
     data object RoleSelection : FreeEdDestination("role_selection")
     data object StudentProfileSetup : FreeEdDestination("student_profile_setup")
     data object CompanyProfileSetup : FreeEdDestination("company_profile_setup")
+    data object StudentProfileEdit : FreeEdDestination("student_profile_edit")
+    data object CompanyProfileEdit : FreeEdDestination("company_profile_edit")
     data object Home : FreeEdDestination("home")
     data object Explore : FreeEdDestination("explore")
     data object CreateService : FreeEdDestination("create_service")
@@ -22,11 +24,16 @@ sealed class FreeEdDestination(
     data object MyProfile : FreeEdDestination("my_profile")
     data object Favorites : FreeEdDestination("favorites")
     data object MyServices : FreeEdDestination("my_services")
+    data object MyPortfolio : FreeEdDestination("my_portfolio")
     data object SentRequests : FreeEdDestination("sent_requests")
     data object ReceivedRequests : FreeEdDestination("received_requests")
     data object Settings : FreeEdDestination("settings")
     data object StudentProfile : FreeEdDestination("student_profile/{profileId}") {
         fun createRoute(profileId: String): String = "student_profile/$profileId"
+    }
+
+    data object CompanyProfile : FreeEdDestination("company_profile/{profileId}") {
+        fun createRoute(profileId: String): String = "company_profile/$profileId"
     }
 
     data object ServiceDetail : FreeEdDestination("service_detail/{serviceId}") {
@@ -44,6 +51,14 @@ sealed class FreeEdDestination(
     data object PortfolioItemDetail : FreeEdDestination("portfolio_item/{portfolioItemId}") {
         fun createRoute(portfolioItemId: String): String = "portfolio_item/$portfolioItemId"
     }
+
+    data object PortfolioEditor : FreeEdDestination("portfolio_editor/{portfolioItemId}") {
+        fun createRoute(portfolioItemId: String): String = "portfolio_editor/$portfolioItemId"
+    }
+
+    data object SendRequest : FreeEdDestination("send_request/{serviceId}") {
+        fun createRoute(serviceId: String): String = "send_request/$serviceId"
+    }
 }
 
 enum class MainTabDestination(
@@ -56,4 +71,3 @@ enum class MainTabDestination(
     REQUESTS(route = FreeEdDestination.Requests.route, label = "Solicitudes"),
     PROFILE(route = FreeEdDestination.MyProfile.route, label = "Perfil")
 }
-

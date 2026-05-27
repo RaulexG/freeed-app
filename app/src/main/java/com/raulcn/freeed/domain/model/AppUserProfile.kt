@@ -15,6 +15,8 @@ data class AppUserProfile(
     val semester: Int? = null,
     val businessName: String? = null,
     val industry: String? = null,
-    val contactPersonName: String? = null
+    val contactPersonName: String? = null,
+    val companyLogoUrl: String? = null,
+    val avatarUrl: String? = null,
+    val skills: List<String> = emptyList()
 )
-
