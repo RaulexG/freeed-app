@@ -1,9 +1,11 @@
 package com.raulcn.freeed.app.navigation
 
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AddCircle
 import androidx.compose.material.icons.outlined.BusinessCenter
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Search
@@ -11,12 +13,15 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -107,7 +112,22 @@ fun FreeEdNavHost(
             if (appState.shouldShowBottomBar()) {
                 FreeEdBottomBar(
                     currentRoute = appState.currentDestination()?.route,
+                    hasActiveSession = sessionUiState.hasActiveSession,
+                    role = sessionUiState.profile?.role,
                     onNavigate = { destination ->
+                        if (sessionUiState.hasActiveSession &&
+                            sessionUiState.profile?.role == com.raulcn.freeed.core.model.UserRole.COMPANY &&
+                            destination == MainTabDestination.CREATE
+                        ) {
+                            appState.navController.navigate(FreeEdDestination.Favorites.route)
+                            return@FreeEdBottomBar
+                        }
+
+                        if (!sessionUiState.hasActiveSession && destination == MainTabDestination.REQUESTS) {
+                            appState.navController.navigate(FreeEdDestination.Login.route)
+                            return@FreeEdBottomBar
+                        }
+
                         val protected = destination == MainTabDestination.CREATE ||
                             destination == MainTabDestination.REQUESTS ||
                             destination == MainTabDestination.PROFILE
@@ -306,6 +326,7 @@ private fun androidx.navigation.NavGraphBuilder.mainGraph(
             val sessionUiState by sessionViewModel.uiState.collectAsStateWithLifecycle()
             MyProfileRoute(
                 sessionProfile = sessionUiState.profile,
+                hasActiveSession = sessionUiState.hasActiveSession,
                 onOpenPortfolioItem = {
                     appState.navController.navigate(FreeEdDestination.MyPortfolio.route)
                 },
@@ -318,11 +339,19 @@ private fun androidx.navigation.NavGraphBuilder.mainGraph(
                 onOpenPortfolioItemById = { id ->
                     appState.navController.navigate(FreeEdDestination.PortfolioItemDetail.createRoute(id))
                 },
-                onOpenSettings = { appState.navController.navigate(FreeEdDestination.Settings.route) },
+                onOpenSettings = {
+                    if (sessionUiState.hasActiveSession) {
+                        appState.navController.navigate(FreeEdDestination.Settings.route)
+                    } else {
+                        appState.navController.navigate(FreeEdDestination.Login.route)
+                    }
+                },
                 onOpenFavorites = { appState.navController.navigate(FreeEdDestination.Favorites.route) },
                 onOpenMyServices = { appState.navController.navigate(FreeEdDestination.MyServices.route) },
                 onEditProfile = {
-                    if (sessionUiState.profile?.role == com.raulcn.freeed.core.model.UserRole.STUDENT) {
+                    if (!sessionUiState.hasActiveSession) {
+                        appState.navController.navigate(FreeEdDestination.Register.route)
+                    } else if (sessionUiState.profile?.role == com.raulcn.freeed.core.model.UserRole.STUDENT) {
                         appState.navController.navigate(FreeEdDestination.StudentProfileEdit.route)
                     } else {
                         appState.navController.navigate(FreeEdDestination.CompanyProfileEdit.route)
@@ -508,24 +537,82 @@ private fun androidx.navigation.NavGraphBuilder.detailGraph(
 @Composable
 private fun FreeEdBottomBar(
     currentRoute: String?,
+    hasActiveSession: Boolean,
+    role: com.raulcn.freeed.core.model.UserRole?,
     onNavigate: (MainTabDestination) -> Unit
 ) {
-    NavigationBar {
-        MainTabDestination.entries.forEach { destination ->
+    data class VisualTab(
+        val destination: MainTabDestination,
+        val label: String,
+        val icon: androidx.compose.ui.graphics.vector.ImageVector,
+        val selectedRoute: String = destination.route
+    )
+
+    val tabs = when {
+        !hasActiveSession -> listOf(
+            VisualTab(MainTabDestination.HOME, "Inicio", Icons.Outlined.Home),
+            VisualTab(MainTabDestination.EXPLORE, "Explorar", Icons.Outlined.Search),
+            VisualTab(MainTabDestination.CREATE, "Crear", Icons.Outlined.AddCircle),
+            VisualTab(MainTabDestination.REQUESTS, "Entrar", Icons.Outlined.Person, FreeEdDestination.Login.route),
+            VisualTab(MainTabDestination.PROFILE, "Perfil", Icons.Outlined.Person)
+        )
+        role == com.raulcn.freeed.core.model.UserRole.COMPANY -> listOf(
+            VisualTab(MainTabDestination.HOME, "Inicio", Icons.Outlined.Home),
+            VisualTab(MainTabDestination.EXPLORE, "Explorar", Icons.Outlined.Search),
+            VisualTab(MainTabDestination.CREATE, "Guardados", Icons.Outlined.FavoriteBorder, FreeEdDestination.Favorites.route),
+            VisualTab(MainTabDestination.REQUESTS, "Solicitudes", Icons.Outlined.BusinessCenter),
+            VisualTab(MainTabDestination.PROFILE, "Perfil", Icons.Outlined.Person)
+        )
+        else -> listOf(
+            VisualTab(MainTabDestination.HOME, "Inicio", Icons.Outlined.Home),
+            VisualTab(MainTabDestination.EXPLORE, "Explorar", Icons.Outlined.Search),
+            VisualTab(MainTabDestination.CREATE, "Publicar", Icons.Outlined.AddCircle),
+            VisualTab(MainTabDestination.REQUESTS, "Solicitudes", Icons.Outlined.BusinessCenter),
+            VisualTab(MainTabDestination.PROFILE, "Perfil", Icons.Outlined.Person)
+        )
+    }
+
+    NavigationBar(
+        tonalElevation = 0.dp
+    ) {
+        tabs.forEach { tab ->
+            val selected = currentRoute == tab.selectedRoute
             NavigationBarItem(
-                selected = currentRoute == destination.route,
-                onClick = { onNavigate(destination) },
+                selected = selected,
+                onClick = { onNavigate(tab.destination) },
                 icon = {
-                    val icon = when (destination) {
-                        MainTabDestination.HOME -> Icons.Outlined.Home
-                        MainTabDestination.EXPLORE -> Icons.Outlined.Search
-                        MainTabDestination.CREATE -> Icons.Outlined.AddCircle
-                        MainTabDestination.REQUESTS -> Icons.Outlined.BusinessCenter
-                        MainTabDestination.PROFILE -> Icons.Outlined.Person
+                    if (tab.destination == MainTabDestination.CREATE) {
+                        Surface(
+                            shape = CircleShape,
+                            color = if (selected) {
+                                androidx.compose.material3.MaterialTheme.colorScheme.primary
+                            } else {
+                                androidx.compose.material3.MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                            }
+                        ) {
+                            Icon(
+                                imageVector = tab.icon,
+                                contentDescription = tab.label,
+                                tint = if (selected) {
+                                    androidx.compose.material3.MaterialTheme.colorScheme.onPrimary
+                                } else {
+                                    androidx.compose.material3.MaterialTheme.colorScheme.primary
+                                },
+                                modifier = Modifier.padding(12.dp)
+                            )
+                        }
+                    } else {
+                        Icon(imageVector = tab.icon, contentDescription = tab.label)
                     }
-                    Icon(imageVector = icon, contentDescription = destination.label)
                 },
-                label = { Text(destination.label) }
+                label = { Text(tab.label) },
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                    selectedTextColor = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                    indicatorColor = androidx.compose.material3.MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
+                    unselectedIconColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+                    unselectedTextColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                )
             )
         }
     }

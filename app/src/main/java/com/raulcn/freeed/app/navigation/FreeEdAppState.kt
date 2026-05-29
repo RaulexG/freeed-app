@@ -31,7 +31,7 @@ class FreeEdAppState(
         val destination = currentDestination()
         return MainTabDestination.entries.any { tab ->
             destination.isTopLevelDestination(tab.route)
-        }
+        } || destination.isTopLevelDestination(FreeEdDestination.Favorites.route)
     }
 
     fun navigateToTopLevelDestination(destination: MainTabDestination) {

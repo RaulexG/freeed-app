@@ -1,6 +1,8 @@
 package com.raulcn.freeed.feature.profile
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,7 +17,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.layout.ContentScale
 import coil.compose.AsyncImage
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowForwardIos
 import androidx.compose.material.icons.automirrored.outlined.Logout
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.WorkOutline
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -29,6 +35,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -39,6 +46,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -51,6 +59,7 @@ import com.raulcn.freeed.domain.model.PortfolioItemType
 import com.raulcn.freeed.domain.model.PublicCompanyProfile
 import com.raulcn.freeed.domain.model.PublicStudentProfile
 import com.raulcn.freeed.domain.model.Service
+import com.raulcn.freeed.R
 import com.raulcn.freeed.feature.system.FeatureInfoCard
 import com.raulcn.freeed.feature.system.FreeEdFeatureScaffold
 
@@ -63,6 +72,7 @@ private enum class StudentTab(val label: String) {
 @Composable
 fun MyProfileRoute(
     sessionProfile: AppUserProfile?,
+    hasActiveSession: Boolean,
     onOpenPortfolioItem: () -> Unit,
     onOpenService: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -73,39 +83,54 @@ fun MyProfileRoute(
     onEditProfile: () -> Unit,
     onSignOut: () -> Unit
 ) {
+    val viewModel: MyProfileViewModel = viewModel()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
     FreeEdFeatureScaffold(
         title = "",
         subtitle = ""
     ) {
+        ProfileTopBrandBar()
+        Spacer(modifier = Modifier.height(16.dp))
         if (sessionProfile == null) {
-            FeatureInfoCard(
-                eyebrow = "CUENTA",
-                title = "Estamos cargando tu perfil",
-                body = "Tu sesion ya esta abierta. Espera un momento mientras sincronizamos tu informacion."
-            )
+            if (hasActiveSession) {
+                ProfileLoadingState()
+            } else {
+                GuestProfileState(
+                    onCreateAccount = onEditProfile,
+                    onSignIn = onOpenSettings
+                )
+            }
             return@FreeEdFeatureScaffold
+        }
+
+        LaunchedEffect(sessionProfile.id) {
+            viewModel.load()
         }
 
         ProfileHero(sessionProfile = sessionProfile)
         Spacer(modifier = Modifier.height(18.dp))
 
         if (sessionProfile.role == UserRole.STUDENT) {
-            StudentTabsSection(
+            StudentOverviewSection(
                 sessionProfile = sessionProfile,
+                uiState = uiState,
                 onOpenMyServices = onOpenMyServices,
-                onOpenMyPortfolio = onOpenPortfolioItem,
-                onOpenService = onOpenServiceDetail,
-                onOpenPortfolioItem = onOpenPortfolioItemById
+                onOpenMyPortfolio = onOpenPortfolioItem
             )
         } else {
-            CompanyActionSection(onOpenFavorites = onOpenFavorites)
+            CompanyOverviewSection(
+                sessionProfile = sessionProfile,
+                uiState = uiState,
+                onOpenFavorites = onOpenFavorites
+            )
         }
 
         Spacer(modifier = Modifier.height(18.dp))
         SectionLabel("Cuenta")
         Spacer(modifier = Modifier.height(12.dp))
         AccountActionRow(
-            icon = Icons.Outlined.Settings,
+            icon = Icons.Outlined.Edit,
             title = "Editar perfil",
             body = "Actualiza tu informacion profesional y datos visibles.",
             onClick = onEditProfile
@@ -125,6 +150,202 @@ fun MyProfileRoute(
             onClick = onSignOut,
             isDestructive = true
         )
+    }
+}
+
+@Composable
+private fun StudentOverviewSection(
+    sessionProfile: AppUserProfile,
+    uiState: MyProfileTabsUiState,
+    onOpenMyServices: () -> Unit,
+    onOpenMyPortfolio: () -> Unit
+) {
+    ProfileStatsRow(
+        stats = listOf(
+            uiState.services.size.toString() to "Servicios",
+            uiState.portfolio.size.toString() to "Portafolio",
+            sessionProfile.skills.size.toString() to "Skills"
+        )
+    )
+    Spacer(modifier = Modifier.height(18.dp))
+    SectionLabel("Tu actividad")
+    Spacer(modifier = Modifier.height(12.dp))
+    ActivityListCard(
+        items = listOf(
+            ActivityEntry(
+                icon = Icons.Outlined.WorkOutline,
+                title = "Mis servicios",
+                subtitle = buildString {
+                    append("${uiState.services.count { it.status == ServiceStatus.PUBLISHED }} publicados")
+                    val drafts = uiState.services.count { it.status == ServiceStatus.DRAFT }
+                    if (drafts > 0) append(" · $drafts borrador")
+                },
+                onClick = onOpenMyServices
+            ),
+            ActivityEntry(
+                icon = Icons.Outlined.FavoriteBorder,
+                title = "Mi portafolio",
+                subtitle = "${uiState.portfolio.size} piezas",
+                onClick = onOpenMyPortfolio
+            ),
+            ActivityEntry(
+                icon = Icons.Outlined.Edit,
+                title = "Sobre mi",
+                subtitle = sessionProfile.bio?.takeIf { it.isNotBlank() } ?: "Completa tu presentacion profesional",
+                onClick = onOpenMyPortfolio
+            )
+        )
+    )
+}
+
+@Composable
+private fun CompanyOverviewSection(
+    sessionProfile: AppUserProfile,
+    uiState: MyProfileTabsUiState,
+    onOpenFavorites: () -> Unit
+) {
+    ProfileStatsRow(
+        stats = listOf(
+            "1" to "Cuenta",
+            sessionProfile.skills.size.toString() to "Intereses",
+            uiState.services.size.toString() to "Actividad"
+        )
+    )
+    Spacer(modifier = Modifier.height(18.dp))
+    SectionLabel("Tu actividad")
+    Spacer(modifier = Modifier.height(12.dp))
+    ActivityListCard(
+        items = listOf(
+            ActivityEntry(
+                icon = Icons.Outlined.FavoriteBorder,
+                title = "Talento guardado",
+                subtitle = "Revisa estudiantes y servicios marcados",
+                onClick = onOpenFavorites
+            ),
+            ActivityEntry(
+                icon = Icons.Outlined.WorkOutline,
+                title = "Solicitudes enviadas",
+                subtitle = "Da seguimiento a oportunidades activas",
+                onClick = onOpenFavorites
+            ),
+            ActivityEntry(
+                icon = Icons.Outlined.Settings,
+                title = "Perfil del negocio",
+                subtitle = sessionProfile.industry ?: "Configura la informacion visible de tu negocio",
+                onClick = onOpenFavorites
+            )
+        )
+    )
+}
+
+private data class ActivityEntry(
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val title: String,
+    val subtitle: String,
+    val onClick: () -> Unit
+)
+
+@Composable
+private fun ProfileStatsRow(stats: List<Pair<String, String>>) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(22.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Row(modifier = Modifier.fillMaxWidth()) {
+            stats.forEachIndexed { index, stat ->
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(vertical = 16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = stat.first,
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = stat.second.uppercase(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (index != stats.lastIndex) {
+                    Box(
+                        modifier = Modifier
+                            .padding(vertical = 14.dp)
+                            .size(width = 1.dp, height = 42.dp)
+                            .background(MaterialTheme.colorScheme.outlineVariant)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActivityListCard(items: List<ActivityEntry>) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(24.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column {
+            items.forEachIndexed { index, item ->
+                Surface(onClick = item.onClick, color = androidx.compose.ui.graphics.Color.Transparent) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                        ) {
+                            Icon(
+                                imageVector = item.icon,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(11.dp).size(18.dp)
+                            )
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = item.title,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = item.subtitle,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Outlined.ArrowForwardIos,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
+                if (index != items.lastIndex) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -650,16 +871,38 @@ private fun PublicProfileHero(profile: PublicStudentProfile) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(96.dp)
+                    .height(118.dp)
                     .background(
                         Brush.linearGradient(
                             colors = listOf(
                                 MaterialTheme.colorScheme.primary,
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.78f)
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.76f)
                             )
                         )
                     )
-            )
+            ) {
+                Box(
+                    modifier = Modifier
+                        .padding(horizontal = 18.dp, vertical = 16.dp)
+                        .border(
+                            width = 1.dp,
+                            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.18f),
+                            shape = RoundedCornerShape(999.dp)
+                        )
+                        .background(
+                            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.08f),
+                            shape = RoundedCornerShape(999.dp)
+                        )
+                ) {
+                    Text(
+                        text = "Perfil profesional",
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -690,7 +933,73 @@ private fun PublicProfileHero(profile: PublicStudentProfile) {
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+                    Row(
+                        modifier = Modifier.padding(top = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        profile.semester?.let { ProfileChip("$it semestre") }
+                        if (profile.skills.isNotEmpty()) {
+                            ProfileChip("${profile.skills.size} skills")
+                        }
+                    }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GuestProfileState(
+    onCreateAccount: () -> Unit,
+    onSignIn: () -> Unit
+) {
+    SectionLabel("Perfil")
+    Spacer(modifier = Modifier.height(16.dp))
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(26.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(22.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Edit,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(16.dp)
+                )
+            }
+            Spacer(modifier = Modifier.height(14.dp))
+            Text(
+                text = "Unete a FreeEd",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Construye tu portafolio, recibe solicitudes y haz crecer tu experiencia.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(18.dp))
+            Button(
+                onClick = onCreateAccount,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp)
+            ) {
+                Text("Crear cuenta")
+            }
+            TextButton(onClick = onSignIn) {
+                Text("Iniciar sesion")
             }
         }
     }
@@ -708,7 +1017,7 @@ private fun ProfileHero(sessionProfile: AppUserProfile) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(112.dp)
+                    .height(132.dp)
                     .background(
                         Brush.linearGradient(
                             colors = listOf(
@@ -717,7 +1026,29 @@ private fun ProfileHero(sessionProfile: AppUserProfile) {
                             )
                         )
                     )
-            )
+            ) {
+                Box(
+                    modifier = Modifier
+                        .padding(horizontal = 18.dp, vertical = 16.dp)
+                        .border(
+                            width = 1.dp,
+                            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.18f),
+                            shape = RoundedCornerShape(999.dp)
+                        )
+                        .background(
+                            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.08f),
+                            shape = RoundedCornerShape(999.dp)
+                        )
+                ) {
+                    Text(
+                        text = if (sessionProfile.role == UserRole.STUDENT) "Mi perfil" else "Perfil de empresa",
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -750,10 +1081,137 @@ private fun ProfileHero(sessionProfile: AppUserProfile) {
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    RoleBadges(sessionProfile)
                 }
             }
         }
     }
+}
+
+@Composable
+private fun ProfileLoadingState() {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(28.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 22.dp, vertical = 28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            CircularProgressIndicator(strokeWidth = 2.5.dp)
+            Text(
+                text = "Estamos preparando tu perfil",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                text = "Tu sesion ya esta abierta. En un momento cargaremos tu informacion profesional.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+    Spacer(modifier = Modifier.height(16.dp))
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(24.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column {
+            GuestSettingsRow(title = "Idioma", subtitle = "Espanol")
+            DividerLine()
+            GuestSettingsRow(title = "Privacidad", subtitle = "Tu informacion y seguridad")
+            DividerLine()
+            GuestSettingsRow(title = "Contacto", subtitle = "Ayuda y soporte")
+        }
+    }
+}
+
+@Composable
+private fun ProfileTopBrandBar() {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Image(
+            painter = painterResource(R.drawable.freeed_logo_banner),
+            contentDescription = "FreeEd",
+            modifier = Modifier
+                .size(width = 96.dp, height = 34.dp),
+            contentScale = ContentScale.Fit
+        )
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Settings,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(10.dp).size(18.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun GuestSettingsRow(title: String, subtitle: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Outlined.ArrowForwardIos,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(10.dp).size(12.dp)
+            )
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Icon(
+            imageVector = Icons.AutoMirrored.Outlined.ArrowForwardIos,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(14.dp)
+        )
+    }
+}
+
+@Composable
+private fun DividerLine() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+    )
 }
 
 @Composable
@@ -810,7 +1268,13 @@ private fun CompanyActionSection(onOpenFavorites: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(14.dp))
-            OutlinedButton(onClick = onOpenFavorites, shape = RoundedCornerShape(18.dp)) {
+            OutlinedButton(
+                onClick = onOpenFavorites,
+                shape = RoundedCornerShape(18.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Outlined.FavoriteBorder, contentDescription = null)
+                Spacer(modifier = Modifier.size(8.dp))
                 Text("Ver favoritos")
             }
         }
@@ -884,6 +1348,7 @@ private fun RoleBadges(sessionProfile: AppUserProfile) {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             sessionProfile.degreeProgram?.takeIf { it.isNotBlank() }?.let { ProfileChip(it) }
             sessionProfile.semester?.let { ProfileChip("$it semestre") }
+            sessionProfile.industry?.takeIf { it.isNotBlank() }?.let { ProfileChip(it) }
         }
     }
 }

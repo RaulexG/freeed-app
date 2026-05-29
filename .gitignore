@@ -1,6 +1,8 @@
 # Kotlin / Java
 *.iml
 *.class
+*.jar
+*.keystore
 
 # Gradle
 .gradle
@@ -30,11 +32,15 @@ local.properties
 
 # Logs
 *.log
+hs_err_pid*
 
 # OS files
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# Temp / AI workspace helpers
+.codex_temp/
 
 # Local Supabase CLI binaries and runtime state (must not be committed)
 /tools/

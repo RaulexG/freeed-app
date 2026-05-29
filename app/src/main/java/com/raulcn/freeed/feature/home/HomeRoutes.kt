@@ -5,6 +5,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,10 +19,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.School
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -75,12 +79,6 @@ fun HomeRoute(
         title = "",
         subtitle = ""
     ) {
-        HomeTopBar(
-            sessionProfile = sessionProfile,
-            onPrimaryAction = if (sessionProfile == null) onRequireAuth else onOpenOwnProfile
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-
         if (uiState.isLoading) {
             CircularProgressIndicator()
             Spacer(modifier = Modifier.height(18.dp))
@@ -95,48 +93,98 @@ fun HomeRoute(
             Spacer(modifier = Modifier.height(18.dp))
         }
 
-        SectionHeader(
-            title = "Categorias",
-            actionLabel = "Ver todo",
-            onActionClick = onExploreMore
-        )
-        Spacer(modifier = Modifier.height(14.dp))
-        if (uiState.categories.isEmpty() && !uiState.isLoading) {
-            EmptyInfoCard(
-                title = "No hay categorias disponibles",
-                body = "Apareceran aqui en cuanto se publiquen en la plataforma."
-            )
-        } else {
-            CategoryRows(
-                categories = uiState.categories,
-                onCategoryClick = onExploreMore
-            )
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-        SectionHeader(
-            title = if (sessionProfile == null) "Servicios destacados" else "Oportunidades",
-            actionLabel = "Explorar",
-            onActionClick = onExploreMore
-        )
-        Spacer(modifier = Modifier.height(14.dp))
-        if (uiState.featuredServices.isEmpty() && !uiState.isLoading) {
-            EmptyInfoCard(
-                title = "Todavia no hay servicios visibles",
-                body = "Cuando se publiquen servicios, se mostraran aqui."
-            )
-        } else {
-            uiState.featuredServices.forEach { service ->
-                ServicePreviewCard(
-                    service = service,
-                    onOpen = { onOpenService(service.id) },
-                    isFavorite = uiState.favoriteIds.contains(service.id),
-                    onToggleFavorite = if (uiState.isCompany) {
-                        { viewModel.toggleFavorite(service.id) }
-                    } else null
+        when (sessionProfile?.role) {
+            null -> {
+                GuestHomeHeader(
+                    onOpenAuth = onRequireAuth
+                )
+                Spacer(modifier = Modifier.height(18.dp))
+                SectionHeader(
+                    title = "Explora por categoria",
+                    actionLabel = null,
+                    onActionClick = null
                 )
                 Spacer(modifier = Modifier.height(12.dp))
+                if (uiState.categories.isEmpty() && !uiState.isLoading) {
+                    EmptyInfoCard(
+                        title = "No hay categorias disponibles",
+                        body = "Apareceran aqui en cuanto se publiquen en la plataforma."
+                    )
+                } else {
+                    CategoryRows(
+                        categories = uiState.categories,
+                        onCategoryClick = onExploreMore
+                    )
+                }
+                Spacer(modifier = Modifier.height(24.dp))
+                SectionHeader(
+                    title = "Servicios destacados",
+                    actionLabel = "Ver todo",
+                    onActionClick = onExploreMore
+                )
+                Spacer(modifier = Modifier.height(14.dp))
+                FeaturedServicesRail(
+                    services = uiState.featuredServices,
+                    favoriteIds = uiState.favoriteIds,
+                    isCompany = uiState.isCompany,
+                    onOpenService = onOpenService,
+                    onToggleFavorite = viewModel::toggleFavorite
+                )
             }
+
+            UserRole.STUDENT -> {
+                StudentHomeHeader(
+                    sessionProfile = sessionProfile,
+                    onOpenProfile = onOpenOwnProfile
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                StudentSearchCard(onExploreMore = onExploreMore)
+                Spacer(modifier = Modifier.height(16.dp))
+                StudentStatsRow()
+                Spacer(modifier = Modifier.height(16.dp))
+                StudentOpportunityCard(onOpenRequests = onExploreMore)
+                Spacer(modifier = Modifier.height(20.dp))
+                SectionHeader("Categorias", "Ver todo", onExploreMore)
+                Spacer(modifier = Modifier.height(12.dp))
+                CategoryRows(uiState.categories, onExploreMore)
+                Spacer(modifier = Modifier.height(20.dp))
+                SectionHeader("Servicios destacados", "Ver todo", onExploreMore)
+                Spacer(modifier = Modifier.height(14.dp))
+                FeaturedServicesRail(
+                    services = uiState.featuredServices,
+                    favoriteIds = uiState.favoriteIds,
+                    isCompany = false,
+                    onOpenService = onOpenService,
+                    onToggleFavorite = viewModel::toggleFavorite
+                )
+            }
+
+            UserRole.COMPANY -> {
+                CompanyHomeHeader(
+                    sessionProfile = sessionProfile,
+                    onOpenProfile = onOpenOwnProfile
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                CompanySearchCard(onExploreMore = onExploreMore)
+                Spacer(modifier = Modifier.height(16.dp))
+                CompanyDiscoverCard(onExploreMore = onExploreMore)
+                Spacer(modifier = Modifier.height(20.dp))
+                SectionHeader("Categorias populares", "Ver todo", onExploreMore)
+                Spacer(modifier = Modifier.height(12.dp))
+                CategoryRows(uiState.categories, onExploreMore)
+                Spacer(modifier = Modifier.height(20.dp))
+                SectionHeader("Talento y servicios", "Ver todo", onExploreMore)
+                Spacer(modifier = Modifier.height(14.dp))
+                FeaturedServicesRail(
+                    services = uiState.featuredServices,
+                    favoriteIds = uiState.favoriteIds,
+                    isCompany = true,
+                    onOpenService = onOpenService,
+                    onToggleFavorite = viewModel::toggleFavorite
+                )
+            }
+
+            UserRole.ADMIN -> Unit
         }
     }
 }
@@ -158,15 +206,17 @@ fun ExploreRoute(
 
     FreeEdFeatureScaffold(
         title = "Explorar",
-        subtitle = "Servicios publicados"
+        subtitle = "Servicios y talento universitario verificado."
     ) {
-        SearchBarField(
+        ExploreSearchRow(
             value = uiState.query,
             onValueChange = viewModel::onQueryChange,
             isSearching = uiState.isSearching
         )
         Spacer(modifier = Modifier.height(14.dp))
 
+        ExploreToggleHeader()
+        Spacer(modifier = Modifier.height(12.dp))
         if (uiState.categories.isNotEmpty()) {
             CategoryFilterRow(
                 categories = uiState.categories,
@@ -221,20 +271,14 @@ fun ExploreRoute(
                 }
             )
             else -> {
-                SectionHeader(title = "Resultados", actionLabel = null, onActionClick = null)
-                Spacer(modifier = Modifier.height(14.dp))
-                uiState.services.forEach { service ->
-                    ServicePreviewCard(
-                        service = service,
-                        onOpen = { onOpenService(service.id) },
-                        onOpenAuthor = { onOpenStudent(service.studentId) },
-                        isFavorite = uiState.favoriteIds.contains(service.id),
-                        onToggleFavorite = if (uiState.isCompany) {
-                            { viewModel.toggleFavorite(service.id) }
-                        } else null
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
+                CompactExploreGrid(
+                    services = uiState.services,
+                    favoriteIds = uiState.favoriteIds,
+                    isCompany = uiState.isCompany,
+                    onOpenService = onOpenService,
+                    onOpenStudent = onOpenStudent,
+                    onToggleFavorite = viewModel::toggleFavorite
+                )
             }
         }
     }
@@ -308,25 +352,136 @@ fun CreateServiceRoute(
     ) {
         when {
             !hasActiveSession -> {
-                Button(onClick = onRequireAuth, modifier = Modifier.fillMaxWidth()) {
-                    Text("Iniciar sesion")
-                }
+                FeatureInfoCard(
+                    eyebrow = "CUENTA",
+                    title = "Inicia sesion para publicar tus servicios",
+                    body = "Crea una oferta clara, agrega una imagen y deja visible tu trabajo para que empresas te encuentren.",
+                    actionLabel = "Iniciar sesion",
+                    onActionClick = onRequireAuth
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                CreateInfoCard(
+                    title = "Lo que podras mostrar",
+                    points = listOf(
+                        "Titulo, descripcion y modalidad de trabajo",
+                        "Precio fijo o propuesta a convenir",
+                        "Imagen principal y evidencia profesional"
+                    )
+                )
             }
 
             sessionProfile == null -> {
                 CircularProgressIndicator()
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Estamos preparando tu espacio de publicacion",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
 
             sessionProfile.role == UserRole.COMPANY -> {
-                EmptyInfoCard(
-                    title = "Solo estudiantes publican servicios",
-                    body = "Con cuenta de empresa puedes explorar talento y enviar solicitudes."
+                FeatureInfoCard(
+                    eyebrow = "EMPRESA",
+                    title = "Tu cuenta esta enfocada en contratar talento",
+                    body = "Como empresa puedes explorar perfiles, guardar favoritos y enviar solicitudes a los estudiantes."
                 )
             }
 
             else -> {
-                Button(onClick = onOpenEditor, modifier = Modifier.fillMaxWidth()) {
-                    Text("Crear servicio")
+                CreateHeroCard(
+                    sessionProfile = sessionProfile,
+                    onOpenEditor = onOpenEditor
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                CreateInfoCard(
+                    title = "Antes de publicarlo",
+                    points = listOf(
+                        "Explica entregables y tiempo estimado",
+                        "Usa una descripcion directa y concreta",
+                        "Agrega una imagen para destacar en explorar"
+                    )
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CreateHeroCard(
+    sessionProfile: AppUserProfile,
+    onOpenEditor: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(28.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Text(
+                text = "Convierte tu experiencia en una propuesta clara",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Publica un servicio alineado con ${sessionProfile.degreeProgram ?: "tu perfil profesional"} y deja visible lo que puedes resolver.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(18.dp))
+            Button(
+                onClick = onOpenEditor,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp)
+            ) {
+                Text("Crear servicio")
+            }
+        }
+    }
+}
+
+@Composable
+private fun CreateInfoCard(
+    title: String,
+    points: List<String>
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(24.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(18.dp)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+            points.forEach { point ->
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                    ) {
+                        Text(
+                            text = "•",
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Text(
+                        text = point,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }
@@ -334,9 +489,97 @@ fun CreateServiceRoute(
 }
 
 @Composable
-private fun HomeTopBar(
-    sessionProfile: AppUserProfile?,
-    onPrimaryAction: () -> Unit
+private fun GuestHomeHeader(
+    onOpenAuth: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary),
+        shape = RoundedCornerShape(28.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 22.dp)) {
+            Text(
+                text = "PLATAFORMA ESTUDIANTIL",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.secondary,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                text = "Tu carrera empieza antes de egresar.",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.ExtraBold,
+                color = MaterialTheme.colorScheme.onPrimary
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                text = "Publica servicios, construye portafolio y conecta con negocios que buscan talento universitario.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.84f)
+            )
+            Spacer(modifier = Modifier.height(18.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Button(
+                    onClick = onOpenAuth,
+                    shape = RoundedCornerShape(18.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondary,
+                        contentColor = MaterialTheme.colorScheme.onSecondary
+                    )
+                ) {
+                    Text("Crear cuenta gratis")
+                }
+                OutlinedButton(
+                    onClick = onOpenAuth,
+                    shape = RoundedCornerShape(18.dp),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.24f)
+                    ),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    )
+                ) {
+                    Text("Iniciar sesion")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StudentHomeHeader(
+    sessionProfile: AppUserProfile,
+    onOpenProfile: () -> Unit
+) {
+    HomeAccountHeader(
+        title = "Buenos dias,",
+        name = sessionProfile.displayName.substringBefore(" "),
+        avatarText = sessionProfile.displayName,
+        onOpenProfile = onOpenProfile
+    )
+}
+
+@Composable
+private fun CompanyHomeHeader(
+    sessionProfile: AppUserProfile,
+    onOpenProfile: () -> Unit
+) {
+    HomeAccountHeader(
+        title = "Bienvenidos,",
+        name = sessionProfile.businessName ?: sessionProfile.displayName,
+        avatarText = sessionProfile.businessName ?: sessionProfile.displayName,
+        onOpenProfile = onOpenProfile
+    )
+}
+
+@Composable
+private fun HomeAccountHeader(
+    title: String,
+    name: String,
+    avatarText: String,
+    onOpenProfile: () -> Unit
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -344,98 +587,151 @@ private fun HomeTopBar(
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Row(
-            modifier = Modifier.weight(1f),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Row(
-                modifier = Modifier.clickable(onClick = onPrimaryAction),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
             ) {
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                ) {
-                    if (sessionProfile == null) {
-                        Icon(
-                            imageVector = Icons.Rounded.School,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(10.dp)
-                        )
-                    } else {
-                        Text(
-                            text = sessionProfile.displayName
-                                .split(" ")
-                                .mapNotNull { it.firstOrNull()?.uppercase() }
-                                .take(2)
-                                .joinToString(""),
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                }
-                Column {
-                    Text(
-                        text = if (sessionProfile == null) {
-                            "Bienvenido"
-                        } else {
-                            "Bienvenido, ${sessionProfile.displayName.substringBefore(" ")}"
-                        },
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-            }
-        }
-
-        if (sessionProfile != null) {
-            Spacer(modifier = Modifier.width(12.dp))
-            OutlinedButton(onClick = onPrimaryAction) {
-                Icon(
-                    imageVector = Icons.Outlined.BookmarkBorder,
-                    contentDescription = "Mi perfil"
+                Text(
+                    text = avatarText
+                        .split(" ")
+                        .mapNotNull { it.firstOrNull()?.uppercase() }
+                        .take(2)
+                        .joinToString(""),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
                 )
             }
+            Column {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = name,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            RoundedActionIcon(Icons.Outlined.NotificationsNone)
+            RoundedActionIcon(Icons.Outlined.BookmarkBorder, onClick = onOpenProfile)
         }
     }
 }
 
 @Composable
-private fun SearchBarField(
+private fun SearchShell(
+    placeholder: String,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(20.dp),
+        tonalElevation = 1.dp,
+        shadowElevation = 1.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(Icons.Outlined.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                text = placeholder,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun StudentSearchCard(onExploreMore: () -> Unit) {
+    SearchShell(
+        placeholder = "Buscar servicios, estudiantes, skills...",
+        onClick = onExploreMore
+    )
+}
+
+@Composable
+private fun CompanySearchCard(onExploreMore: () -> Unit) {
+    SearchShell(
+        placeholder = "Encuentra talento por skill o universidad...",
+        onClick = onExploreMore
+    )
+}
+
+@Composable
+private fun ExploreSearchRow(
     value: String,
     onValueChange: (String) -> Unit,
     isSearching: Boolean
 ) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        modifier = Modifier.fillMaxWidth(),
-        singleLine = true,
-        shape = RoundedCornerShape(18.dp),
-        placeholder = { Text("Buscar habilidades, servicios o talento") },
-        leadingIcon = {
-            Icon(
-                imageVector = Icons.Outlined.Search,
-                contentDescription = null
-            )
-        },
-        trailingIcon = {
-            when {
-                isSearching -> CircularProgressIndicator(
-                    strokeWidth = 2.dp,
-                    modifier = Modifier.padding(8.dp)
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            modifier = Modifier.weight(1f),
+            singleLine = true,
+            shape = RoundedCornerShape(18.dp),
+            placeholder = { Text("Servicios, skills, herramientas...") },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Outlined.Search,
+                    contentDescription = null
                 )
-                value.isNotBlank() -> IconButton(onClick = { onValueChange("") }) {
-                    Icon(Icons.Outlined.Close, contentDescription = "Limpiar")
+            },
+            trailingIcon = {
+                when {
+                    isSearching -> CircularProgressIndicator(
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.padding(8.dp)
+                    )
+                    value.isNotBlank() -> IconButton(onClick = { onValueChange("") }) {
+                        Icon(Icons.Outlined.Close, contentDescription = "Limpiar")
+                    }
                 }
             }
+        )
+        Surface(
+            color = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(16.dp),
+            tonalElevation = 1.dp
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Tune,
+                contentDescription = null,
+                modifier = Modifier.padding(14.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
-    )
+    }
+}
+
+@Composable
+private fun ExploreToggleHeader() {
+    Row(horizontalArrangement = Arrangement.spacedBy(20.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = "Servicios",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            text = "Talento",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
 }
 
 @Composable
@@ -594,6 +890,310 @@ private fun ServicePreviewCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun CompactExploreGrid(
+    services: List<Service>,
+    favoriteIds: Set<String>,
+    isCompany: Boolean,
+    onOpenService: (String) -> Unit,
+    onOpenStudent: (String) -> Unit,
+    onToggleFavorite: (String) -> Unit
+) {
+    val rows = services.chunked(2)
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        rows.forEach { pair ->
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                pair.forEach { service ->
+                    CompactServiceCard(
+                        modifier = Modifier.weight(1f),
+                        service = service,
+                        isFavorite = favoriteIds.contains(service.id),
+                        showFavorite = isCompany,
+                        onOpen = { onOpenService(service.id) },
+                        onOpenAuthor = { onOpenStudent(service.studentId) },
+                        onToggleFavorite = { onToggleFavorite(service.id) }
+                    )
+                }
+                if (pair.size == 1) {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FeaturedServicesRail(
+    services: List<Service>,
+    favoriteIds: Set<String>,
+    isCompany: Boolean,
+    onOpenService: (String) -> Unit,
+    onToggleFavorite: (String) -> Unit
+) {
+    if (services.isEmpty()) {
+        EmptyInfoCard(
+            title = "Todavia no hay servicios visibles",
+            body = "Cuando se publiquen servicios, se mostraran aqui."
+        )
+        return
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        services.forEach { service ->
+            CompactServiceCard(
+                modifier = Modifier.width(210.dp),
+                service = service,
+                isFavorite = favoriteIds.contains(service.id),
+                showFavorite = isCompany,
+                onOpen = { onOpenService(service.id) },
+                onOpenAuthor = null,
+                onToggleFavorite = { onToggleFavorite(service.id) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun CompactServiceCard(
+    modifier: Modifier = Modifier,
+    service: Service,
+    isFavorite: Boolean,
+    showFavorite: Boolean,
+    onOpen: () -> Unit,
+    onOpenAuthor: (() -> Unit)?,
+    onToggleFavorite: () -> Unit
+) {
+    Card(
+        modifier = modifier.clickable(onClick = onOpen),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(22.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(112.dp),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+            ) {
+                if (!service.imageUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = service.imageUrl,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxWidth(),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+                Box(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surface,
+                        shape = RoundedCornerShape(999.dp),
+                        modifier = Modifier.align(Alignment.BottomStart)
+                    ) {
+                        Text(
+                            text = service.modality.label,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    if (showFavorite) {
+                        Surface(
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .clickable(onClick = onToggleFavorite),
+                            color = MaterialTheme.colorScheme.surface,
+                            shape = CircleShape
+                        ) {
+                            Icon(
+                                imageVector = if (isFavorite) Icons.Rounded.Favorite else Icons.Outlined.FavoriteBorder,
+                                contentDescription = null,
+                                tint = if (isFavorite) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(8.dp)
+                            )
+                        }
+                    }
+                }
+            }
+            Column(modifier = Modifier.padding(14.dp)) {
+                Text(
+                    text = service.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2
+                )
+                if (!service.shortDescription.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = service.shortDescription,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2
+                    )
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = service.priceLabel ?: "Precio a convenir",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Bold
+                )
+                if (onOpenAuthor != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    TextButton(onClick = onOpenAuthor) {
+                        Text("Ver perfil")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StudentStatsRow() {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(22.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Row(modifier = Modifier.fillMaxWidth()) {
+            StatCell(number = "4", label = "Servicios", modifier = Modifier.weight(1f))
+            StatCell(number = "3", label = "Portafolio", modifier = Modifier.weight(1f))
+            StatCell(number = "3", label = "Solicitudes", modifier = Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun RowScope.StatCell(number: String, label: String, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.padding(vertical = 14.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(number, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun StudentOpportunityCard(onOpenRequests: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary),
+        shape = RoundedCornerShape(24.dp)
+    ) {
+        Column(modifier = Modifier.padding(18.dp)) {
+            Text(
+                text = "NUEVA OPORTUNIDAD",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.secondary,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Cafeteria La Manana solicito tu servicio",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onPrimary,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = "Identidad visual · Hace 2 horas",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.78f)
+            )
+            Spacer(modifier = Modifier.height(14.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(
+                    onClick = onOpenRequests,
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondary,
+                        contentColor = MaterialTheme.colorScheme.onSecondary
+                    )
+                ) { Text("Ver solicitud") }
+                OutlinedButton(
+                    onClick = onOpenRequests,
+                    shape = RoundedCornerShape(16.dp),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.24f)
+                    ),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    )
+                ) { Text("Todas") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CompanyDiscoverCard(onExploreMore: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary),
+        shape = RoundedCornerShape(24.dp)
+    ) {
+        Column(modifier = Modifier.padding(18.dp)) {
+            Text(
+                text = "DESCUBRE",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.secondary,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Estudiantes verificados de tu ciudad",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onPrimary,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = "Filtra por skills, semestre y universidad.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.78f)
+            )
+            Spacer(modifier = Modifier.height(14.dp))
+            Button(
+                onClick = onExploreMore,
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondary,
+                    contentColor = MaterialTheme.colorScheme.onSecondary
+                )
+            ) { Text("Explorar talento") }
+        }
+    }
+}
+
+@Composable
+private fun RoundedActionIcon(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: (() -> Unit)? = null
+) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 1.dp,
+        modifier = Modifier.clickable(enabled = onClick != null) { onClick?.invoke() }
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.padding(12.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 

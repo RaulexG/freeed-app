@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -180,18 +181,19 @@ fun RegisterRoute(
                     onGoToLogin = onBackClick
                 )
             } else if (currentStep == 1) {
+                StepEyebrow(text = "Paso 1")
                 Text(
-                    text = "Como te describes?",
+                    text = "Como quieres usar FreeEd?",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Elige el tipo de cuenta que mejor representa tu objetivo en FreeEd.",
+                    text = "Elige tu tipo de cuenta. Despues te pediremos los datos de acceso.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Spacer(modifier = Modifier.height(18.dp))
+                Spacer(modifier = Modifier.height(20.dp))
                 RoleChoiceRow(
                     selectedRole = uiState.selectedRole,
                     onRoleSelected = viewModel::onRoleSelected
@@ -219,14 +221,17 @@ fun RegisterRoute(
                     Text("Continuar")
                 }
             } else {
+                StepEyebrow(text = "Paso 2")
                 Text(
-                    text = "Tu cuenta",
+                    text = "Crea tu cuenta",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(8.dp))
+                SelectedRoleBanner(role = uiState.selectedRole)
+                Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    text = "Crea tu acceso con correo y contrasena. Podras editar tu perfil despues.",
+                    text = "Ingresa nombre, correo y contrasena para continuar.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -469,25 +474,27 @@ private fun RoleChoiceRow(
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         RoleChoiceChip(
             title = "Estudiante",
-            body = "Construye tu portafolio y consigue tus primeras oportunidades.",
+            body = "Construye portafolio, publica servicios y gana experiencia profesional mientras estudias.",
             highlights = listOf(
                 "Perfil profesional visible",
                 "Servicios y portafolio",
                 "Solicitudes de empresas"
             ),
             icon = Icons.Rounded.School,
+            badge = "Recomendado",
             isSelected = selectedRole == UserRole.STUDENT,
             onClick = { onRoleSelected(UserRole.STUDENT) }
         )
         RoleChoiceChip(
             title = "Empresa o negocio",
-            body = "Encuentra talento universitario para proyectos y colaboraciones.",
+            body = "Encuentra talento universitario para proyectos puntuales, apoyo operativo y crecimiento digital.",
             highlights = listOf(
                 "Explorar perfiles",
                 "Guardar favoritos",
                 "Enviar solicitudes"
             ),
             icon = Icons.Rounded.Apartment,
+            badge = null,
             isSelected = selectedRole == UserRole.COMPANY,
             onClick = { onRoleSelected(UserRole.COMPANY) }
         )
@@ -500,6 +507,7 @@ private fun RoleChoiceChip(
     body: String,
     highlights: List<String>,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
+    badge: String?,
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
@@ -521,7 +529,7 @@ private fun RoleChoiceChip(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(18.dp),
+            .padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Row(
@@ -530,12 +538,14 @@ private fun RoleChoiceChip(
             ) {
                 Surface(
                     color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                    shape = RoundedCornerShape(14.dp)
+                    shape = RoundedCornerShape(16.dp)
                 ) {
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
-                        modifier = Modifier.padding(10.dp),
+                        modifier = Modifier
+                            .padding(12.dp)
+                            .size(22.dp),
                         tint = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary
                     )
                 }
@@ -543,22 +553,35 @@ private fun RoleChoiceChip(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        if (badge != null) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.14f),
+                                shape = RoundedCornerShape(999.dp)
+                            ) {
+                                Text(
+                                    text = badge,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.secondary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
                     Text(
                         text = body,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                if (isSelected) {
-                    Icon(
-                        imageVector = Icons.Rounded.CheckCircle,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
                     )
                 }
             }
@@ -580,6 +603,24 @@ private fun RoleChoiceChip(
                             text = item,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+            if (isSelected) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                        shape = CircleShape
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.CheckCircle,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(8.dp)
                         )
                     }
                 }
@@ -664,30 +705,80 @@ private fun RegisterHeader(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Surface(
-                color = if (currentStep >= 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
-                shape = RoundedCornerShape(999.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .padding(horizontal = 28.dp, vertical = 3.dp)
-                )
-            }
-            Surface(
-                color = if (currentStep >= 2) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
-                shape = RoundedCornerShape(999.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .padding(horizontal = 28.dp, vertical = 3.dp)
-                )
-            }
-            Spacer(modifier = Modifier.weight(1f))
+            ProgressSegment(isActive = currentStep >= 1)
+            ProgressSegment(isActive = currentStep >= 2)
             Text(
-                text = "$currentStep/2",
+                text = "$currentStep de 2",
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+    }
+}
+
+@Composable
+private fun StepEyebrow(text: String) {
+    Text(
+        text = text.uppercase(),
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.secondary,
+        fontWeight = FontWeight.Bold
+    )
+}
+
+@Composable
+private fun SelectedRoleBanner(role: UserRole?) {
+    if (role == null) return
+
+    val (label, icon) = when (role) {
+        UserRole.STUDENT -> "Cuenta de estudiante" to Icons.Rounded.School
+        UserRole.COMPANY -> "Cuenta de empresa o negocio" to Icons.Rounded.Apartment
+        UserRole.ADMIN -> "Cuenta administrativa" to Icons.Rounded.CheckCircle
+    }
+
+    Surface(
+        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.16f))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Surface(
+                color = MaterialTheme.colorScheme.primary,
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.padding(8.dp)
+                )
+            }
+            Text(
+                text = label,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProgressSegment(isActive: Boolean) {
+    Surface(
+        modifier = Modifier.width(76.dp),
+        color = if (isActive) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+        },
+        shape = RoundedCornerShape(999.dp)
+    ) {
+        Box(modifier = Modifier.height(4.dp))
     }
 }

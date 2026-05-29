@@ -1,6 +1,7 @@
 package com.raulcn.freeed.feature.requests
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -8,12 +9,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowForwardIos
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -57,53 +62,252 @@ fun RequestsRoute(
         if (isCompany) sentViewModel.load() else receivedViewModel.load()
     }
 
-    FreeEdFeatureScaffold(
-        title = "Solicitudes",
-        subtitle = "Oportunidades y seguimiento"
-    ) {
-        if (isCompany) {
-            when {
-                sentUiState.isLoading -> CircularProgressIndicator()
-                sentUiState.errorMessage != null -> FeatureInfoCard(
-                    eyebrow = "ERROR",
-                    title = "No pudimos cargar la lista",
-                    body = sentUiState.errorMessage.orEmpty()
-                )
-                sentUiState.items.isEmpty() -> FeatureInfoCard(
-                    eyebrow = "VACIO",
-                    title = "Aun no envias solicitudes",
-                    body = "Explora servicios y crea tu primera solicitud."
-                )
-                else -> sentUiState.items.forEach { request ->
-                    SentRequestCard(
-                        request = request,
-                        onOpen = { onOpenRequest(request.id) }
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
+    val items = if (isCompany) sentUiState.items else receivedUiState.items
+    val isLoading = if (isCompany) sentUiState.isLoading else receivedUiState.isLoading
+    val errorMessage = if (isCompany) sentUiState.errorMessage else receivedUiState.errorMessage
+    FreeEdFeatureScaffold(title = "Solicitudes", subtitle = "") {
+        when {
+            isLoading -> CircularProgressIndicator()
+            errorMessage != null -> FeatureInfoCard(
+                eyebrow = "ERROR",
+                title = "No pudimos cargar tus solicitudes",
+                body = errorMessage
+            )
+            items.isEmpty() -> FeatureInfoCard(
+                eyebrow = "SOLICITUDES",
+                title = if (isCompany) "Aun no envias solicitudes" else "Aun no recibes solicitudes",
+                body = if (isCompany) {
+                    "Explora servicios y crea tu primera oportunidad."
+                } else {
+                    "Cuando una empresa te contacte, veras la conversacion aqui."
                 }
-            }
-        } else {
-            when {
-                receivedUiState.isLoading -> CircularProgressIndicator()
-                receivedUiState.errorMessage != null -> FeatureInfoCard(
-                    eyebrow = "ERROR",
-                    title = "No pudimos cargar la bandeja",
-                    body = receivedUiState.errorMessage.orEmpty()
-                )
-                receivedUiState.items.isEmpty() -> FeatureInfoCard(
-                    eyebrow = "VACIO",
-                    title = "Aun no tienes solicitudes",
-                    body = "Cuando una empresa te contacte, aparecera aqui."
-                )
-                else -> receivedUiState.items.forEach { request ->
-                    ReceivedRequestCard(
+            )
+            else -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                items.forEach { request ->
+                    RequestInboxCard(
                         request = request,
+                        isCompany = isCompany,
                         onOpen = { onOpenRequest(request.id) },
-                        onOpenCompany = { onOpenCompanyProfile(request.companyId) }
+                        onOpenCompany = {
+                            if (!isCompany) onOpenCompanyProfile(request.companyId)
+                        }
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun RequestsHeaderTabs(
+    primary: String,
+    secondary: String
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(20.dp)
+    ) {
+        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+            RequestHeaderTab(text = primary, selected = true)
+        }
+        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+            RequestHeaderTab(text = secondary, selected = false)
+        }
+    }
+}
+
+@Composable
+private fun RequestHeaderTab(
+    text: String,
+    selected: Boolean
+) {
+    Column {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+            color = if (selected) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Surface(
+            modifier = Modifier.size(width = 70.dp, height = 3.dp),
+            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+            shape = RoundedCornerShape(999.dp)
+        ) {
+            Spacer(modifier = Modifier.size(width = 70.dp, height = 3.dp))
+        }
+    }
+}
+
+@Composable
+private fun RequestInboxCard(
+    request: ServiceRequest,
+    isCompany: Boolean,
+    onOpen: () -> Unit,
+    onOpenCompany: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(24.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.Top
+            ) {
+                InitialBubble(
+                    text = if (isCompany) request.title else (request.companyDisplayName ?: "FR")
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (isCompany) "A" else "De",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = if (isCompany) {
+                            request.serviceTitle ?: request.title
+                        } else {
+                            request.companyDisplayName ?: "Empresa interesada"
+                        },
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+                StatusChip(status = request.status)
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                text = if (isCompany) request.title else (request.serviceTitle ?: request.title),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            ) {
+                Text(
+                    text = request.message.take(110),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = request.createdAt?.let(::requestTimeLabel) ?: "Ver detalle",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                if (!isCompany) {
+                    TextButton(onClick = onOpenCompany) {
+                        Text("Empresa")
+                    }
+                }
+                Surface(
+                    onClick = onOpen,
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Outlined.ArrowForwardIos,
+                        contentDescription = "Abrir solicitud",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(10.dp).size(14.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun InitialBubble(text: String) {
+    Surface(
+        modifier = Modifier.size(42.dp),
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                text = text
+                    .split(" ")
+                    .mapNotNull { it.firstOrNull()?.uppercase() }
+                    .take(2)
+                    .joinToString(""),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+    }
+}
+
+private fun requestTimeLabel(raw: String): String {
+    return when {
+        raw.contains("T") -> raw.substringBefore("T").replace('-', '/')
+        raw.length >= 10 -> raw.take(10).replace('-', '/')
+        else -> raw
+    }
+}
+
+@Composable
+private fun RequestsSummaryRow(
+    primaryLabel: String,
+    primaryValue: String,
+    secondaryLabel: String,
+    secondaryValue: String
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        SummaryCard(
+            modifier = Modifier.weight(1f),
+            value = primaryValue,
+            label = primaryLabel
+        )
+        SummaryCard(
+            modifier = Modifier.weight(1f),
+            value = secondaryValue,
+            label = secondaryLabel
+        )
+    }
+}
+
+@Composable
+private fun SummaryCard(
+    modifier: Modifier = Modifier,
+    value: String,
+    label: String
+) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(22.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
