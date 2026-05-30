@@ -85,12 +85,20 @@ class AppSessionViewModel(
                         )
                     }
 
-                    is SessionStatus.NotAuthenticated,
-                    is SessionStatus.RefreshFailure -> {
+                    is SessionStatus.NotAuthenticated -> {
                         _uiState.value = _uiState.value.copy(
                             isLoading = false,
                             hasActiveSession = false,
                             routeTarget = SessionRouteTarget.Home,
+                            profile = null
+                        )
+                    }
+
+                    is SessionStatus.RefreshFailure -> {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            hasActiveSession = false,
+                            routeTarget = SessionRouteTarget.Login,
                             profile = null
                         )
                     }

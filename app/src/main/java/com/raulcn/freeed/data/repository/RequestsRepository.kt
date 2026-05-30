@@ -76,6 +76,9 @@ class RequestsRepository {
         rejectionReason: String? = null,
         cancelledReason: String? = null
     ) {
+        val userId = client.auth.currentUserOrNull()?.id
+            ?: error("No authenticated user found.")
+
         val payload = buildJsonObject {
             put("status", newStatus.backendValue)
             when (newStatus) {
@@ -89,7 +92,13 @@ class RequestsRepository {
         }
 
         client.from("service_requests").update(payload) {
-            filter { eq("id", requestId) }
+            filter {
+                eq("id", requestId)
+                or {
+                    eq("student_id", userId)
+                    eq("company_id", userId)
+                }
+            }
         }
     }
 }

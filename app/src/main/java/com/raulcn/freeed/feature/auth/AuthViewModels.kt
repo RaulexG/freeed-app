@@ -45,6 +45,10 @@ class LoginViewModel(
             _uiState.update { it.copy(errorMessage = "Ingresa correo y contrasena.") }
             return
         }
+        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(state.email.trim()).matches()) {
+            _uiState.update { it.copy(errorMessage = "Ingresa un correo valido.") }
+            return
+        }
 
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
@@ -133,8 +137,10 @@ class RegisterViewModel(
 
     private fun validate(state: RegisterFormUiState): String? {
         if (state.displayName.isBlank()) return "Ingresa tu nombre."
+        if (state.displayName.trim().length > 100) return "El nombre no puede tener mas de 100 caracteres."
         if (state.email.isBlank()) return "Ingresa tu correo."
-        if (state.password.length < 6) return "La contrasena debe tener al menos 6 caracteres."
+        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(state.email.trim()).matches()) return "Ingresa un correo valido."
+        if (state.password.length < 8) return "La contrasena debe tener al menos 8 caracteres."
         if (state.password != state.confirmPassword) return "Las contrasenas no coinciden."
         if (state.selectedRole == null) return "Selecciona tu tipo de cuenta."
         return null

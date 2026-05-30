@@ -101,6 +101,9 @@ class ServicesRepository {
     }
 
     suspend fun updateService(serviceId: String, draft: ServiceDraft) {
+        val userId = client.auth.currentUserOrNull()?.id
+            ?: error("No authenticated user found.")
+
         val payload = buildJsonObject {
             put("category_id", draft.categoryId)
             put("title", draft.title.trim())
@@ -118,11 +121,15 @@ class ServicesRepository {
         client.from("services").update(payload) {
             filter {
                 eq("id", serviceId)
+                eq("student_id", userId)
             }
         }
     }
 
     suspend fun updateStatus(serviceId: String, status: ServiceStatus) {
+        val userId = client.auth.currentUserOrNull()?.id
+            ?: error("No authenticated user found.")
+
         val payload = buildJsonObject {
             put("service_status", status.backendValue)
             if (status == ServiceStatus.PUBLISHED) {
@@ -133,6 +140,7 @@ class ServicesRepository {
         client.from("services").update(payload) {
             filter {
                 eq("id", serviceId)
+                eq("student_id", userId)
             }
         }
     }
